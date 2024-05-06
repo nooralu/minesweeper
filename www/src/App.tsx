@@ -11,7 +11,6 @@ function App() {
 
   useEffect(() => {
     const board = new Board(WIDTH, HEIGHT);
-    board.genrateMines(3);
     setBoard(board);
     setTiles(board?.getTiles() ?? []);
   }, []);

@@ -62,6 +62,7 @@ pub struct Board {
     height: usize,
     tiles: Vec<Tile>,
     rng: ThreadRng,
+    first_click: bool,
 }
 
 #[wasm_bindgen]
@@ -82,16 +83,17 @@ impl Board {
             height,
             rng,
             tiles,
+            first_click: true,
         }
     }
 
-    #[wasm_bindgen(js_name = genrateMines)]
-    pub fn genrate_mines(&mut self, num_mine: usize) {
+    fn genrate_mines(&mut self, init_index: usize, num_mine: usize) {
         let mut random_palce = || -> bool {
-            let x: usize = self.rng.gen_range(0..self.width);
-            let y = self.rng.gen_range(0..self.height);
-            let tile = self.get_mut(x, y);
-            if let Some(tile) = tile {
+            let mut index = init_index;
+            while index == init_index {
+                index = self.rng.gen_range(0..self.width * self.height);
+            }
+            if let Some(tile) = self.tiles.get_mut(index) {
                 match tile.mine {
                     Some(mine) if mine => false,
                     _ => {
@@ -124,6 +126,12 @@ impl Board {
         let mine = self.tiles.get_mut(index).unwrap();
         if left {
             mine.revealed = true;
+            if self.first_click {
+                // TODO: handle magic number 3
+                self.genrate_mines(index, 3);
+                self.first_click = false;
+            }
+            self.expend_zero_tile(index);
         } else {
             mine.flagged = Some(true);
         }
@@ -137,7 +145,7 @@ impl Board {
                     continue;
                 }
                 let adjacent_mines = self
-                    .get_siblings(&tile)
+                    .get_siblings(tile.index)
                     .iter()
                     .map(|t| if t.has_mine() { 1 } else { 0 })
                     .fold(0, |acc, a| acc + a);
@@ -146,11 +154,31 @@ impl Board {
         }
     }
 
-    fn get_siblings(&self, tile: &Tile) -> Vec<&Tile> {
+    fn expend_zero_tile(&mut self, index: usize) {
+        let tile = self.tiles.get_mut(index);
+        if let Some(tile) = tile {
+            if tile.adjacent_mines != 0 {
+                return;
+            }
+            let sliblings: Vec<usize> = self.get_siblings(index).iter().map(|s| s.index).collect();
+            for s in sliblings {
+                let tile = self.tiles.get_mut(s).unwrap();
+                if !tile.revealed {
+                    if !tile.is_flagged() {
+                        tile.revealed = true;
+                    }
+                    let index = tile.index;
+                    self.expend_zero_tile(index);
+                }
+            }
+        }
+    }
+
+    fn get_siblings(&self, index: usize) -> Vec<&Tile> {
         DIERECTIONS
             .iter()
             .map(|(dx, dy)| {
-                let (x, y) = Self::calculate_loc(tile.index, self.width);
+                let (x, y) = Self::calculate_loc(index, self.width);
                 let x = x as i32 + dx;
                 let y = y as i32 + dy;
                 if x < 0 || x >= self.width as i32 || y < 0 || y >= self.height as i32 {
