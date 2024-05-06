@@ -1,12 +1,10 @@
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::wasm_bindgen;
+
+mod settings;
+mod board;
 
 #[wasm_bindgen]
 extern "C" {
-    pub fn alert(s: &str);
+  #[wasm_bindgen(js_namespace = console)]
+  pub fn debug(s: &str);
 }
-
-#[wasm_bindgen]
-pub fn hello(name: &str) {
-    alert(&format!("Hello {name}!"));
-}
-

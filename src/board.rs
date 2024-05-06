@@ -1,21 +1,24 @@
 use rand::{rngs::ThreadRng, Rng};
+use wasm_bindgen::prelude::*;
 
-use crate::settings::DIERECTIONS;
+use crate::{debug, settings::DIERECTIONS};
 
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
 pub struct Tile {
-    x: usize,
-    y: usize,
+    index: usize,
     revealed: bool,
     adjacent_mines: usize,
     mine: Option<bool>,
     flagged: Option<bool>,
 }
 
+#[wasm_bindgen]
 impl Tile {
-    pub fn new(x: usize, y: usize) -> Self {
+    #[wasm_bindgen(constructor)]
+    pub fn new(index: usize) -> Self {
         Self {
-            x,
-            y,
+            index,
             revealed: false,
             adjacent_mines: 0,
             mine: None,
@@ -23,38 +26,57 @@ impl Tile {
         }
     }
 
+    #[wasm_bindgen(js_name = hasMine)]
     pub fn has_mine(&self) -> bool {
         self.mine.is_some_and(|mine| mine)
     }
 
+    #[wasm_bindgen(js_name = getIndex)]
+    pub fn get_index(&self) -> usize {
+        self.index
+    }
+
+    #[wasm_bindgen(js_name = getAdjacentMines)]
     pub fn get_adjacent_mines(&self) -> usize {
         self.adjacent_mines
     }
 
+    #[wasm_bindgen(js_name = isRevealed)]
     pub fn is_revealed(&self) -> bool {
         self.revealed
     }
+
+    #[wasm_bindgen(js_name = isFlagged)]
+    pub fn is_flagged(&self) -> bool {
+        if let Some(flagged) = self.flagged {
+            flagged
+        } else {
+            false
+        }
+    }
 }
 
+#[wasm_bindgen]
 pub struct Board {
     width: usize,
     height: usize,
-    tiles: Vec<Vec<Tile>>,
+    tiles: Vec<Tile>,
     rng: ThreadRng,
 }
 
+#[wasm_bindgen]
 impl Board {
+    #[wasm_bindgen(constructor)]
     pub fn new(width: usize, height: usize) -> Self {
         let rng = rand::thread_rng();
         let mut tiles = vec![];
 
         for y in 0..height {
-            let mut row = vec![];
             for x in 0..width {
-                row.push(Tile::new(x, y));
+                tiles.push(Tile::new(Self::calculate_index(x, y, width)));
             }
-            tiles.push(row);
         }
+
         Self {
             width,
             height,
@@ -63,6 +85,7 @@ impl Board {
         }
     }
 
+    #[wasm_bindgen(js_name = genrateMines)]
     pub fn genrate_mines(&mut self, num_mine: usize) {
         let mut random_palce = || -> bool {
             let x: usize = self.rng.gen_range(0..self.width);
@@ -90,13 +113,20 @@ impl Board {
         self.update_numbers();
     }
 
-    pub fn get_tiles(&self) -> &Vec<Vec<Tile>> {
-        &self.tiles
+    #[wasm_bindgen(js_name = getTiles)]
+    pub fn get_tiles(&self) -> Vec<Tile> {
+        self.tiles.clone()
     }
 
-    pub fn on_click(&mut self, x: usize, y: usize) {
-        let mine = self.get_mut(x, y).unwrap();
-        mine.revealed = true;
+    #[wasm_bindgen(js_name = onClick)]
+    pub fn on_click(&mut self, index: usize, left: bool) {
+        debug(&format!("click index {}", index));
+        let mine = self.tiles.get_mut(index).unwrap();
+        if left {
+            mine.revealed = true;
+        } else {
+            mine.flagged = Some(true);
+        }
     }
 
     fn update_numbers(&mut self) {
@@ -120,8 +150,9 @@ impl Board {
         DIERECTIONS
             .iter()
             .map(|(dx, dy)| {
-                let x = tile.x as i32 + dx;
-                let y = tile.y as i32 + dy;
+                let (x, y) = Self::calculate_loc(tile.index, self.width);
+                let x = x as i32 + dx;
+                let y = y as i32 + dy;
                 if x < 0 || x >= self.width as i32 || y < 0 || y >= self.height as i32 {
                     None
                 } else {
@@ -134,16 +165,21 @@ impl Board {
     }
 
     fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
-        match self.tiles.get_mut(y) {
-            Some(row) => row.get_mut(x),
-            _ => None,
-        }
+        let index = Self::calculate_index(x, y, self.width);
+        self.tiles.get_mut(index)
     }
 
     fn get(&self, x: usize, y: usize) -> Option<&Tile> {
-        match self.tiles.get(y) {
-            Some(row) => row.get(x),
-            _ => None,
-        }
+        self.tiles.get(Self::calculate_index(x, y, self.width))
+    }
+
+    fn calculate_index(x: usize, y: usize, width: usize) -> usize {
+        y * width + x
+    }
+
+    fn calculate_loc(index: usize, width: usize) -> (usize, usize) {
+        let x = index % width;
+        let y = index / width;
+        (x, y)
     }
 }

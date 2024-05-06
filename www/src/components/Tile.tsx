@@ -1,21 +1,34 @@
 import boom from '../assets/boom.svg';
 import flag from '../assets/flag.svg';
-import ITile from '../types/Tile';
+import { Tile as ITile } from 'minsweeper';
 
-export default function Tile({ tile }: { tile: ITile }) {
+type Props = {
+  tile: ITile,
+  onLeftClick: (index: number) => void,
+  onRightClick: (index: number) => void,
+}
+
+export default function Tile({tile, onLeftClick, onRightClick} : Props) {
   let content = null;
-  if (tile.flagged) {
+  if (tile.isFlagged()) {
     content = <img src={flag} width='50%'></img>;
-  } else if (tile.revealed) {
-    if (tile.mine) {
+  } else if (tile.isRevealed()) {
+    if (tile.hasMine()) {
       content = <img src={boom} width='50%'></img>;
     } else {
-      content = <div>{tile.adjacentMines}</div>;
+      content = <div>{tile.getAdjacentMines()}</div>;
     }
   }
 
   return (
-    <button className='w-12 h-12 bg-slate-300/75 rounded flex justify-center items-center select-none hover:bg-slate-300'>
+    <button 
+      onClick={() => onLeftClick(tile.getIndex())}
+      onContextMenu={(e) => {
+        onRightClick(tile.getIndex());
+        e.preventDefault();
+      }}
+      className='w-12 h-12 bg-slate-300/75 rounded flex justify-center items-center select-none hover:bg-slate-300'
+      >
       {content}
     </button>
   );
