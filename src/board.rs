@@ -1,7 +1,17 @@
+use std::collections::HashMap;
+
 use rand::{rngs::ThreadRng, Rng};
 use wasm_bindgen::prelude::*;
 
 use crate::{debug, settings::DIERECTIONS};
+
+#[wasm_bindgen]
+#[derive(PartialEq, Eq, Hash)]
+pub enum Difficulty {
+    Easy,
+    Medium,
+    Hard,
+}
 
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
@@ -58,40 +68,58 @@ impl Tile {
 
 #[wasm_bindgen]
 pub struct Board {
-    width: usize,
-    height: usize,
     tiles: Vec<Tile>,
     rng: ThreadRng,
     first_click: bool,
+    difficuty: Difficulty,
+    difficulty_map: HashMap<Difficulty, (usize, usize, usize)>,
 }
 
 #[wasm_bindgen]
 impl Board {
     #[wasm_bindgen(constructor)]
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new(difficuty: Difficulty) -> Self {
         let rng = rand::thread_rng();
         let mut tiles = vec![];
 
-        for y in 0..height {
-            for x in 0..width {
-                tiles.push(Tile::new(Self::calculate_index(x, y, width)));
+        let mut difficulty_map = HashMap::with_capacity(3);
+        difficulty_map.insert(Difficulty::Easy, (9, 9, 10));
+        difficulty_map.insert(Difficulty::Medium, (16, 16, 40));
+        difficulty_map.insert(Difficulty::Hard, (16, 30, 99));
+
+        let (width, height, _) = difficulty_map.get(&difficuty).unwrap();
+        for y in 0..*height {
+            for x in 0..*width {
+                tiles.push(Tile::new(Self::calculate_index(x, y, *width)));
             }
         }
 
         Self {
-            width,
-            height,
             rng,
             tiles,
+            difficulty_map,
             first_click: true,
+            difficuty,
         }
+    }
+
+    pub fn get_width(&self) -> usize {
+        self.difficulty_map.get(&self.difficuty).unwrap().0
+    }
+
+    pub fn get_height(&self) -> usize {
+        self.difficulty_map.get(&self.difficuty).unwrap().1
+    }
+
+    pub fn get_mines(&self) -> usize {
+        self.difficulty_map.get(&self.difficuty).unwrap().2
     }
 
     fn genrate_mines(&mut self, init_index: usize, num_mine: usize) {
         let mut random_palce = || -> bool {
             let mut index = init_index;
             while index == init_index {
-                index = self.rng.gen_range(0..self.width * self.height);
+                index = self.rng.gen_range(0..self.get_width() * self.get_height());
             }
             if let Some(tile) = self.tiles.get_mut(index) {
                 match tile.mine {
@@ -127,8 +155,7 @@ impl Board {
         if left {
             mine.revealed = true;
             if self.first_click {
-                // TODO: handle magic number 3
-                self.genrate_mines(index, 3);
+                self.genrate_mines(index, self.get_mines());
                 self.first_click = false;
             }
             self.expend_zero_tile(index);
@@ -138,8 +165,8 @@ impl Board {
     }
 
     fn update_numbers(&mut self) {
-        for x in 0..self.width {
-            for y in 0..self.height {
+        for x in 0..self.get_width() {
+            for y in 0..self.get_height() {
                 let tile = self.get(x, y).unwrap();
                 if tile.has_mine() {
                     continue;
@@ -178,10 +205,10 @@ impl Board {
         DIERECTIONS
             .iter()
             .map(|(dx, dy)| {
-                let (x, y) = Self::calculate_loc(index, self.width);
+                let (x, y) = Self::calculate_loc(index, self.get_width());
                 let x = x as i32 + dx;
                 let y = y as i32 + dy;
-                if x < 0 || x >= self.width as i32 || y < 0 || y >= self.height as i32 {
+                if x < 0 || x >= self.get_width() as i32 || y < 0 || y >= self.get_height() as i32 {
                     None
                 } else {
                     self.get(x as usize, y as usize)
@@ -193,12 +220,13 @@ impl Board {
     }
 
     fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
-        let index = Self::calculate_index(x, y, self.width);
+        let index = Self::calculate_index(x, y, self.get_width());
         self.tiles.get_mut(index)
     }
 
     fn get(&self, x: usize, y: usize) -> Option<&Tile> {
-        self.tiles.get(Self::calculate_index(x, y, self.width))
+        self.tiles
+            .get(Self::calculate_index(x, y, self.get_width()))
     }
 
     fn calculate_index(x: usize, y: usize, width: usize) -> usize {

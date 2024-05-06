@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import TileComponent from './components/Tile';
-import { Board, Tile } from 'minsweeper';
-
-const WIDTH = 4;
-const HEIGHT = 4;
+import { Board, Tile, Difficulty } from 'minsweeper';
 
 function App() {
   const [board, setBoard] = useState<Board | null>(null);
   const [tiles, setTiles] = useState<Tile[]>([]);
+  const [difficulty, setDifficulty] = useState(Difficulty.Easy);
+  const [width, setWidth] = useState(0);
 
   useEffect(() => {
-    const board = new Board(WIDTH, HEIGHT);
+    const board = new Board(difficulty);
     setBoard(board);
     setTiles(board?.getTiles() ?? []);
-  }, []);
+    setWidth(board.get_width());
+  }, [width, difficulty]);
 
   function handleClik(index: number, left: boolean = true) {
     board?.onClick(index, left);
@@ -22,18 +22,38 @@ function App() {
 
   return (
     <>
-      <div className='w-screen h-screen flex justify-center items-center'>
-        <div className={`grid grid-cols-4 gap-1`}>
+      <div className='w-screen h-screen pt-10 pb-20 flex flex-col justify-start items-center'>
+        <div className='flex justify-between gap-1 mb-2 text-white'>
+          <button
+            className='w-15 p-2 rounded bg-sky-500/75 hover:bg-sky-500'
+            onClick={() => setDifficulty(Difficulty.Easy)}
+          >
+            简单
+          </button>
+          <button
+            className='w-15 p-2 rounded bg-sky-500/75 hover:bg-sky-500'
+            onClick={() => setDifficulty(Difficulty.Medium)}
+          >
+            普通
+          </button>
+          <button
+            className='w-15 p-2 rounded bg-sky-500/75 hover:bg-sky-500'
+            onClick={() => setDifficulty(Difficulty.Hard)}
+          >
+            困难
+          </button>
+        </div>
+        <div key={difficulty} className={`grid grid-cols-${width} gap-1`}>
           {
             tiles
-            .map((tile, index) => (
-              <TileComponent
-                tile={tile}
-                key={index}
-                onLeftClick={(index) => handleClik(index)}
-                onRightClick={(index) =>handleClik(index, false)}
-              />
-            ))
+              .map((tile, index) => (
+                <TileComponent
+                  tile={tile}
+                  key={`${difficulty}-${index}`}
+                  onLeftClick={(index) => handleClik(index)}
+                  onRightClick={(index) => handleClik(index, false)}
+                />
+              ))
           }
         </div>
       </div>

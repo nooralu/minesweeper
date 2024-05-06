@@ -8,27 +8,27 @@ type Props = {
   onRightClick: (index: number) => void,
 }
 
-export default function Tile({tile, onLeftClick, onRightClick} : Props) {
+export default function Tile({ tile, onLeftClick, onRightClick }: Props) {
   let content = null;
   if (tile.isFlagged()) {
     content = <img src={flag} width='50%'></img>;
   } else if (tile.isRevealed()) {
     if (tile.hasMine()) {
       content = <img src={boom} width='50%'></img>;
-    } else {
+    } else if (tile.getAdjacentMines() !== 0) {
       content = <div>{tile.getAdjacentMines()}</div>;
     }
   }
 
   return (
-    <button 
+    <button
       onClick={() => onLeftClick(tile.getIndex())}
       onContextMenu={(e) => {
         onRightClick(tile.getIndex());
         e.preventDefault();
       }}
-      className='w-12 h-12 bg-slate-300/75 rounded flex justify-center items-center select-none hover:bg-slate-300'
-      >
+      className={`w-12 h-12 ${tile.isRevealed() ? 'bg-slate-300/75' : 'bg-slate-400/75'}  rounded flex justify-center items-center select-none hover:bg-slate-200/75`}
+    >
       {content}
     </button>
   );
