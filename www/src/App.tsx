@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import Tile from './components/Tile';
 
 const WIDTH = 4;
 const HEIGHT = 4;
@@ -7,7 +7,8 @@ function App() {
   const tiles = [];
   for (let i = 0; i < HEIGHT; i += 1) {
     for (let j = 0; j < WIDTH; j += 1) {
-      tiles.push(<button className='bg-slate-300/75 rounded w-12 h-12' key={i * WIDTH + j}></button>)
+      tiles.push(<Tile tile={{ revealed: true, mine: true, adjacentMines: 0 }} key={i * WIDTH + j
+      } />);
     }
   }
 
