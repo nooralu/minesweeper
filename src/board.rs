@@ -1,77 +1,9 @@
-use std::collections::HashMap;
+use std::usize;
+
 use wasm_bindgen::prelude::*;
 
-use crate::{debug, random, settings::DIERECTIONS};
-
-#[wasm_bindgen]
-#[derive(PartialEq, Clone, Copy)]
-pub enum GameState {
-    Ready,
-    Playing,
-    Lost,
-    Won,
-}
-
-#[wasm_bindgen]
-#[derive(PartialEq, Eq, Hash)]
-pub enum Difficulty {
-    Easy,
-    Medium,
-    Hard,
-}
-
-#[wasm_bindgen]
-#[derive(Clone, Copy)]
-pub struct Tile {
-    index: usize,
-    revealed: bool,
-    adjacent_mines: usize,
-    mine: Option<bool>,
-    flagged: Option<bool>,
-}
-
-#[wasm_bindgen]
-impl Tile {
-    #[wasm_bindgen(constructor)]
-    pub fn new(index: usize) -> Self {
-        Self {
-            index,
-            revealed: false,
-            adjacent_mines: 0,
-            mine: None,
-            flagged: None,
-        }
-    }
-
-    #[wasm_bindgen(js_name = hasMine)]
-    pub fn has_mine(&self) -> bool {
-        self.mine.is_some_and(|mine| mine)
-    }
-
-    #[wasm_bindgen(js_name = getIndex)]
-    pub fn get_index(&self) -> usize {
-        self.index
-    }
-
-    #[wasm_bindgen(js_name = getAdjacentMines)]
-    pub fn get_adjacent_mines(&self) -> usize {
-        self.adjacent_mines
-    }
-
-    #[wasm_bindgen(js_name = isRevealed)]
-    pub fn is_revealed(&self) -> bool {
-        self.revealed
-    }
-
-    #[wasm_bindgen(js_name = isFlagged)]
-    pub fn is_flagged(&self) -> bool {
-        if let Some(flagged) = self.flagged {
-            flagged
-        } else {
-            false
-        }
-    }
-}
+use crate::tile::Tile;
+use crate::{debug, random, Difficulty, GameState, DIERECTIONS};
 
 #[wasm_bindgen]
 pub struct Board {
@@ -79,7 +11,6 @@ pub struct Board {
     tiles: Vec<Tile>,
     first_click: bool,
     difficuty: Difficulty,
-    difficulty_map: HashMap<Difficulty, (usize, usize, usize)>,
 }
 
 #[wasm_bindgen]
@@ -88,22 +19,14 @@ impl Board {
     pub fn new(difficuty: Difficulty) -> Self {
         let mut tiles = vec![];
 
-        let mut difficulty_map = HashMap::with_capacity(3);
-        difficulty_map.insert(Difficulty::Easy, (9, 9, 10));
-        difficulty_map.insert(Difficulty::Medium, (16, 16, 40));
-        difficulty_map.insert(Difficulty::Hard, (16, 30, 99));
-
-        let (width, height, _) = difficulty_map.get(&difficuty).unwrap();
-        for y in 0..*height {
-            for x in 0..*width {
-                tiles.push(Tile::new(Self::calculate_index(x, y, *width)));
-            }
+        let (width, height, _) = difficuty.get_config();
+        for index in 0..width * height {
+            tiles.push(Tile::new(index));
         }
 
         Self {
             state: GameState::Ready,
             tiles,
-            difficulty_map,
             first_click: true,
             difficuty,
         }
@@ -116,17 +39,17 @@ impl Board {
 
     #[wasm_bindgen(js_name = getWidth)]
     pub fn get_width(&self) -> usize {
-        self.difficulty_map.get(&self.difficuty).unwrap().0
+        self.difficuty.get_config().0
     }
 
     #[wasm_bindgen(js_name = getHeight)]
     pub fn get_height(&self) -> usize {
-        self.difficulty_map.get(&self.difficuty).unwrap().1
+        self.difficuty.get_config().1
     }
 
     #[wasm_bindgen(js_name = getMines)]
     pub fn get_mines(&self) -> usize {
-        self.difficulty_map.get(&self.difficuty).unwrap().2
+        self.difficuty.get_config().2
     }
 
     fn genrate_mines(&mut self, init_index: usize, num_mine: usize) {
@@ -206,19 +129,18 @@ impl Board {
     }
 
     fn update_numbers(&mut self) {
-        for x in 0..self.get_width() {
-            for y in 0..self.get_height() {
-                let tile = self.get(x, y).unwrap();
-                if tile.has_mine() {
-                    continue;
-                }
-                let adjacent_mines = self
-                    .get_siblings(tile.index)
-                    .iter()
-                    .map(|t| if t.has_mine() { 1 } else { 0 })
-                    .fold(0, |acc, a| acc + a);
-                self.get_mut(x, y).unwrap().adjacent_mines = adjacent_mines;
+        for index in 0..self.tiles.len() {
+            let tile = self.tiles.get_mut(index).unwrap();
+            if tile.has_mine() {
+                continue;
             }
+
+            let adjacent_mines = self
+                .get_siblings(index)
+                .iter()
+                .map(|t| if t.has_mine() { 1 } else { 0 })
+                .sum::<usize>();
+            self.tiles.get_mut(index).unwrap().adjacent_mines = adjacent_mines;
         }
     }
 
@@ -243,38 +165,24 @@ impl Board {
     }
 
     fn get_siblings(&self, index: usize) -> Vec<&Tile> {
+        let width = self.get_width();
         DIERECTIONS
             .iter()
-            .map(|(dx, dy)| {
-                let (x, y) = Self::calculate_loc(index, self.get_width());
+            .filter_map(|(dx, dy)| {
+                let (x, y) = self.calculate_loc(index);
                 let x = x as i32 + dx;
                 let y = y as i32 + dy;
                 if x < 0 || x >= self.get_width() as i32 || y < 0 || y >= self.get_height() as i32 {
                     None
                 } else {
-                    self.get(x as usize, y as usize)
+                    self.tiles.get(y as usize * width + x as usize)
                 }
             })
-            .filter(|s| s.is_some())
-            .map(|s| s.unwrap())
             .collect()
     }
 
-    fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
-        let index = Self::calculate_index(x, y, self.get_width());
-        self.tiles.get_mut(index)
-    }
-
-    fn get(&self, x: usize, y: usize) -> Option<&Tile> {
-        self.tiles
-            .get(Self::calculate_index(x, y, self.get_width()))
-    }
-
-    fn calculate_index(x: usize, y: usize, width: usize) -> usize {
-        y * width + x
-    }
-
-    fn calculate_loc(index: usize, width: usize) -> (usize, usize) {
+    fn calculate_loc(&self, index: usize) -> (usize, usize) {
+        let width = self.get_width();
         let x = index % width;
         let y = index / width;
         (x, y)
