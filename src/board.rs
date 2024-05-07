@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-
-use rand::{rngs::ThreadRng, Rng};
 use wasm_bindgen::prelude::*;
 
-use crate::{debug, settings::DIERECTIONS};
+use crate::{debug, random, settings::DIERECTIONS};
 
 #[wasm_bindgen]
 #[derive(PartialEq, Clone, Copy)]
@@ -79,7 +77,6 @@ impl Tile {
 pub struct Board {
     state: GameState,
     tiles: Vec<Tile>,
-    rng: ThreadRng,
     first_click: bool,
     difficuty: Difficulty,
     difficulty_map: HashMap<Difficulty, (usize, usize, usize)>,
@@ -89,7 +86,6 @@ pub struct Board {
 impl Board {
     #[wasm_bindgen(constructor)]
     pub fn new(difficuty: Difficulty) -> Self {
-        let rng = rand::thread_rng();
         let mut tiles = vec![];
 
         let mut difficulty_map = HashMap::with_capacity(3);
@@ -106,7 +102,6 @@ impl Board {
 
         Self {
             state: GameState::Ready,
-            rng,
             tiles,
             difficulty_map,
             first_click: true,
@@ -138,7 +133,7 @@ impl Board {
         let mut random_palce = || -> bool {
             let mut index = init_index;
             while index == init_index {
-                index = self.rng.gen_range(0..self.get_width() * self.get_height());
+                index = (random() * self.tiles.len() as f64) as usize;
             }
             if let Some(tile) = self.tiles.get_mut(index) {
                 match tile.mine {
