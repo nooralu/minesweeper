@@ -3,6 +3,7 @@ import TileComponent from './components/Tile';
 import { Board, Tile, Difficulty, GameState } from 'minsweeper';
 import ToolBar from './components/ToolBar';
 import StateBar from './components/StateBar';
+
 function App() {
   const [board, setBoard] = useState<Board | null>(null);
   const [tiles, setTiles] = useState<Tile[]>([]);
@@ -12,12 +13,16 @@ function App() {
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {
+    newGame();
+  }, [difficulty]);
+
+  function newGame() {
     const board = new Board(difficulty);
     setBoard(board);
     setTiles(board?.getTiles() ?? []);
     setWidth(board.getWidth());
     setState(board?.getState() ?? GameState.Ready);
-  }, [width, difficulty]);
+  }
 
   useEffect(() => {
     if (state === GameState.Ready) {
@@ -36,10 +41,18 @@ function App() {
     setState(board?.getState() ?? GameState.Ready);
   }
 
+  function handleChangeDifficulty(target: Difficulty) {
+    if (difficulty === target) {
+      newGame();
+    } else {
+      setDifficulty(target);
+    }
+  }
+
   return (
     <>
       <div className='w-full pt-10 pb-20 flex flex-col justify-start items-center'>
-        <ToolBar setDifficulty={setDifficulty} />
+        <ToolBar setDifficulty={handleChangeDifficulty} />
         <StateBar duration={duration} difficulty={difficulty} state={state} />
         <div className='grid gap-1' style={{ gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))` }}>
           {
