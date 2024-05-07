@@ -6,6 +6,15 @@ use wasm_bindgen::prelude::*;
 use crate::{debug, settings::DIERECTIONS};
 
 #[wasm_bindgen]
+#[derive(PartialEq, Clone, Copy)]
+pub enum GameState {
+    Ready,
+    Playing,
+    Lost,
+    Won,
+}
+
+#[wasm_bindgen]
 #[derive(PartialEq, Eq, Hash)]
 pub enum Difficulty {
     Easy,
@@ -68,6 +77,7 @@ impl Tile {
 
 #[wasm_bindgen]
 pub struct Board {
+    state: GameState,
     tiles: Vec<Tile>,
     rng: ThreadRng,
     first_click: bool,
@@ -95,6 +105,7 @@ impl Board {
         }
 
         Self {
+            state: GameState::Ready,
             rng,
             tiles,
             difficulty_map,
@@ -103,14 +114,22 @@ impl Board {
         }
     }
 
+    #[wasm_bindgen(js_name = getState)]
+    pub fn get_state(&self) -> GameState {
+        self.state
+    }
+
+    #[wasm_bindgen(js_name = getWidth)]
     pub fn get_width(&self) -> usize {
         self.difficulty_map.get(&self.difficuty).unwrap().0
     }
 
+    #[wasm_bindgen(js_name = getHeight)]
     pub fn get_height(&self) -> usize {
         self.difficulty_map.get(&self.difficuty).unwrap().1
     }
 
+    #[wasm_bindgen(js_name = getMines)]
     pub fn get_mines(&self) -> usize {
         self.difficulty_map.get(&self.difficuty).unwrap().2
     }
@@ -141,6 +160,8 @@ impl Board {
             }
         }
         self.update_numbers();
+        self.state = GameState::Playing;
+        debug("Game start");
     }
 
     #[wasm_bindgen(js_name = getTiles)]
@@ -150,6 +171,10 @@ impl Board {
 
     #[wasm_bindgen(js_name = onClick)]
     pub fn on_click(&mut self, index: usize, left: bool) {
+        if self.state != GameState::Ready && self.state != GameState::Playing {
+            debug("not playing");
+            return;
+        }
         debug(&format!("click index {}", index));
         let mine = self.tiles.get_mut(index).unwrap();
         if left {
@@ -161,6 +186,27 @@ impl Board {
             self.expend_zero_tile(index);
         } else {
             mine.flagged = Some(true);
+        }
+        self.update_state();
+    }
+
+    fn update_state(&mut self) {
+        let mut cnt = 0;
+        for tile in &self.tiles {
+            // if any mine is revealed, then lost
+            if tile.has_mine() && tile.is_revealed() {
+                self.state = GameState::Lost;
+                debug("lost");
+                return;
+            }
+            // count tiels that are not mine and not revealed
+            if !tile.has_mine() && !tile.is_revealed() {
+                cnt += 1;
+            }
+        }
+        if cnt == 0 {
+            self.state = GameState::Won;
+            debug("won");
         }
     }
 
