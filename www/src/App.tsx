@@ -43,7 +43,7 @@ function App() {
             困难
           </button>
         </div>
-        <div key={difficulty} className={`grid grid-cols-${width} gap-1`}>
+        <div className='grid gap-1' style={{ gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))` }}>
           {
             tiles
               .map((tile, index) => (
